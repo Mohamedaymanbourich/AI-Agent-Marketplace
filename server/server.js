@@ -5,8 +5,8 @@ import 'dotenv/config';
 import connectDB from './configs/mongodb.js';
 import connectCloudinary from './configs/cloudinary.js';
 import userRouter from './routes/userRoutes.js';
-import { clerkMiddleware } from '@clerk/express';
 import { clerkWebhooks, stripeWebhooks } from './controllers/webhooks.js';
+import { getClerkMiddleware } from './configs/clerk.js';
 import creatorRouter from './routes/CreatorRoutes.js';
 import agentRouter from './routes/agentRoutes.js';
 
@@ -14,9 +14,18 @@ import agentRouter from './routes/agentRoutes.js';
 const app = express();
 
 
-// Connect to database
-await connectDB();
-await connectCloudinary();
+// Connect to database and optional services (safe on missing env vars)
+try {
+  await connectDB();
+} catch (err) {
+  console.warn('Database connection failed or skipped:', err && err.message ? err.message : err);
+}
+
+try {
+  await connectCloudinary();
+} catch (err) {
+  console.warn('Cloudinary initialization failed or skipped:', err && err.message ? err.message : err);
+}
 
 // Middlewares
 
@@ -36,7 +45,8 @@ app.get('/', (req, res) => res.send("API Working"));
 app.post('/clerk', express.json(), clerkWebhooks);
 app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
 
-app.use(clerkMiddleware());
+// Clerk middleware (real or fallback)
+app.use(getClerkMiddleware());
 
 app.use('/api/creator', express.json(), creatorRouter);
 app.use('/api/agent', express.json(), agentRouter);

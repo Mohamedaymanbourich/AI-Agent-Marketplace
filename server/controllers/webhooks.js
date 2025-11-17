@@ -2,7 +2,6 @@ import Agent from "../models/Agent.js";
 import { AgentRun } from "../models/AgentRun.js";
 import { Purchase } from "../models/Purchase.js";
 import User from "../models/User.js";
-import stripe from "stripe";
 import { Webhook } from "svix";
 import stripePkg from "stripe";
 
@@ -177,9 +176,14 @@ export const clerkWebhooks = async (req, res) => {
    ------------------------------------------------------------------ */
 
 
-const stripeInstance = new stripePkg(process.env.STRIPE_SECRET_KEY);
-
 export const stripeWebhooks = async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.warn("STRIPE_SECRET_KEY not set; skipping Stripe webhook handling.");
+    return res.status(500).send("Stripe not configured on server.");
+  }
+  const stripeInstance = new stripePkg(process.env.STRIPE_SECRET_KEY);
+
+  
   const sig = req.headers["stripe-signature"];
 
   let event;
