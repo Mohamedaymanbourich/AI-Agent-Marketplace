@@ -2,7 +2,7 @@ import express from 'express';
 import { addAgent, creatorDashboardData, updateRoleToCreator, getAgentRunHistory, getMyAgents } from '../controllers/creatorController.js';
 import upload from '../configs/multer.js';
 import { protectCreator } from '../middlewares/authMiddleware.js';
-import { requireAuth } from '@clerk/express';
+// Clerk `requireAuth` removed to avoid importing Clerk at module load; using local middleware instead
 
 const creatorRouter = express.Router();
 

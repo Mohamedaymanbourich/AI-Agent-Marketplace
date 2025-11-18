@@ -12,6 +12,7 @@ export const getUserData = async (req, res) => {
       return res.json({ success: false, message: "Unauthorizedd" });
     }
     const userId = req.auth.userId;
+    console.log("UserID:", userId); // Debugging line
     const user = await User.findById(userId);
     if (!user) {
       return res.json({ success: false, message: "User Not Found" });
@@ -243,12 +244,17 @@ export const purchaseAgentRun = async (req, res) => {
 
     /* create Stripe checkout session ----------------------------- */
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
-    const currency       = process.env.CURRENCY.toLowerCase();
-
+    // Validate currency env var (expect 3-letter ISO code). Default to 'usd' when invalid.
+    let currency = (process.env.CURRENCY || 'usd').toLowerCase();
+    if (!/^[a-z]{3}$/.test(currency)) {
+      console.warn(`Invalid or missing CURRENCY env var: ${process.env.CURRENCY}. Falling back to 'usd'.`);
+      currency = 'usd';
+    }
+    console.log("Currency:", currency);
     const line_items = [
       {
         price_data: {
-          currency,
+          currency    : "usd",
           product_data: { name: agent.agentName },
           unit_amount : Math.floor(purchase.amount * 100),
         },

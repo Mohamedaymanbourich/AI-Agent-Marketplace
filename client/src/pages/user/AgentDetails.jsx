@@ -58,7 +58,7 @@ const AgentDetails = () => {
             <p className="text-sm text-gray-500 mb-4">Prompt Template Preview:</p>
             <pre className="bg-gray-100 p-3 rounded text-sm text-gray-600 overflow-x-auto whitespace-pre-wrap">{agentData.promptTemplate}</pre>
             <button onClick={handleRunAgent} className="mt-6 px-6 py-3 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition">
-              Run Agent for {currency}{agentData.pricePerRun}
+              Run Agent for {currency}  {agentData.pricePerRun}
             </button>
           </div>
           <div className="min-w-[300px] max-w-[400px]">

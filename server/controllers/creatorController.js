@@ -3,14 +3,23 @@ import Agent from '../models/Agent.js';
 import { AgentRun } from "../models/AgentRun.js";
 import { Purchase } from '../models/Purchase.js';
 import User from '../models/User.js';
-import { clerkClient } from '@clerk/express';
+import { getClerkClient } from '../configs/clerk.js';
 
 // Update role to agent creator
 export const updateRoleToCreator = async (req, res) => {
   try {
     console.log("hello")
     const userId = req.auth.userId;
-    await clerkClient.users.updateUserMetadata(userId, {
+    const client = getClerkClient();
+    if (!client) {
+      if (process.env.DEV_AUTH_USER) {
+        // local/dev fallback: pretend update succeeded
+        return res.json({ success: true, message: 'You can now publish agents' });
+      }
+      return res.json({ success: false, message: 'Auth not configured' });
+    }
+
+    await client.users.updateUserMetadata(userId, {
       publicMetadata: { role: 'creator' },
     });
     res.json({ success: true, message: 'You can now publish agents' });

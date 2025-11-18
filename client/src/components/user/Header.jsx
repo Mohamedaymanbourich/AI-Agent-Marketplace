@@ -4,7 +4,7 @@ import { Search, Menu, X } from "lucide-react";
 import { useClerk, UserButton, useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import logo2 from '../../assets/AgentHub.png';
+import logo2 from '../../assets/logo2.png';
 
 import { AppContext } from "../../context/AppContext";
 import { assets } from "../../assets/assets";

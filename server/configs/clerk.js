@@ -1,17 +1,16 @@
-import { clerkMiddleware as clerkMW, clerkClient as realClerkClient } from '@clerk/express';
-
 let clerkClient = null;
 
-/**
- * Returns an Express middleware to use for Clerk authentication.
- * If Clerk env vars are present we use the real middleware+client.
- * Otherwise we provide a lightweight development fallback.
- */
-export const getClerkMiddleware = () => {
-  const hasClerk = !!(process.env.CLERK_API_KEY || process.env.CLERK_SECRET || process.env.CLERK_JWT_KEY);
+export async function getClerkMiddleware() {
+  const hasClerk = !!(process.env.CLERK_API_KEY || process.env.CLERK_SECRET || process.env.CLERK_JWT_KEY || process.env.CLERK_PUBLISHABLE_KEY);
   if (hasClerk) {
-    clerkClient = realClerkClient;
-    return clerkMW();
+    try {
+      const mod = await import('@clerk/express');
+      const { clerkMiddleware: clerkMW, clerkClient: realClerkClient } = mod;
+      clerkClient = realClerkClient;
+      return clerkMW();
+    } catch (err) {
+      console.warn('Clerk import/initialization failed, falling back to dev middleware:', err && err.message ? err.message : err);
+    }
   }
 
   console.warn('Clerk not configured; using development fallback middleware. Set CLERK_API_KEY to enable Clerk.');
@@ -30,6 +29,8 @@ export const getClerkMiddleware = () => {
     }
     next();
   };
-};
+}
 
-export { clerkClient };
+export function getClerkClient() {
+  return clerkClient;
+}

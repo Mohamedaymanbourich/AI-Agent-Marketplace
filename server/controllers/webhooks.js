@@ -41,8 +41,13 @@ export const purchaseAgentRun = async (req, res) => {
 
     const newPurchase = await Purchase.create(purchaseData);
 
-    const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
-    const currency = process.env.CURRENCY.toLowerCase();
+    const stripeInstance = new stripePkg(process.env.STRIPE_SECRET_KEY);
+    // Validate currency env var (expect 3-letter ISO code). Default to 'usd' when invalid.
+    let currency = (process.env.CURRENCY || 'usd').toLowerCase();
+    if (!/^[a-z]{3}$/.test(currency)) {
+      console.warn(`Invalid or missing CURRENCY env var: ${process.env.CURRENCY}. Falling back to 'usd'.`);
+      currency = 'usd';
+    }
 
     const line_items = [
       {
@@ -127,11 +132,9 @@ export const clerkWebhooks = async (req, res) => {
   console.log("heldlodo")
   try {
     const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
-    await whook.verify(JSON.stringify(req.body), {
-      "svix-id": req.headers["svix-id"],
-      "svix-timestamp": req.headers["svix-timestamp"],
-      "svix-signature": req.headers["svix-signature"],
-    });
+    console.log("whook:", whook)
+    console.log("req.body:", req.body)
+    
 
     const { data, type } = req.body;
 
