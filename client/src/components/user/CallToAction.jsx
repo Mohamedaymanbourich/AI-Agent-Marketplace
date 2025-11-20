@@ -14,7 +14,7 @@ const CallToAction = () => {
         <button className='px-10 py-3 rounded-md text-white bg-blue-600'>
           Get Started
         </button>
-        <button className='flex items-center gap-2 text-blue-600 hover:underline'>
+        <button className='flex items-center gap-2 text-blue-600 hover:underline '>
           Browse Agents
           <img src={assets.arrow_icon} alt="arrow_icon" />
         </button>

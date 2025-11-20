@@ -50,10 +50,10 @@ const Runs = () => {
         { purchaseId, input },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
+      console.log("Agent run response:", res.data);
       setOutput(
-        res.data?.success
-          ? res.data.result || "Agent run completed successfully."
+        res.data.success
+          ? res.data.body || "Agent run completed successfully."
           : res.data.message || "Agent run failed."
       );
     } catch (err) {

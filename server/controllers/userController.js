@@ -76,54 +76,178 @@ export const addToWorkspace = async (req, res) => {
   }
 };
 
-// Run Agent Once (One-Time Use)
 export const runAgent = async (req, res) => {
-  console.log("runnign agent")
   try {
     const { purchaseId, input } = req.body;
-    const userId = req.auth.userId;
+    const userId = req.auth?.userId;
 
-    if (!purchaseId || !userId) {
-      return res.status(400).json({ success: false, message: "Missing purchaseId or userId" });
+    if (!purchaseId || !userId || !input) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing purchaseId, userId or input",
+      });
     }
 
-    // 1. Find and validate the purchase
+    // 1) Find and validate the purchase (not previously used)
     const purchase = await Purchase.findOne({
       _id: purchaseId,
       userId,
-      // status: "completed",
       used: { $ne: true },
     }).populate("agentId");
 
-    if (!purchase) {
-      return res.status(403).json({ success: false, message: "Invalid or already used purchase." });
+    if (!purchase || !purchase.agentId) {
+      return res.status(403).json({
+        success: false,
+        message: "Invalid or already used purchase.",
+      });
     }
 
     const agent = purchase.agentId;
 
-    // 2. Simulate agent logic (replace with your own logic, OpenAI, etc.)
-    const result = `Agent "${agent.agentName}" processed: ${input}`;
+    // 2) If AI disabled, perform a simple offline rewrite
+    if (process.env.DISABLE_AI === "true") {
+      console.log("[dev-mode] AI disabled — performing local rewrite fallback.");
 
-    // 3. Mark the purchase as used
+      const trimmed = input.trim();
+      const firstLine = trimmed.split(/\r?\n/).find((l) => l.trim().length > 0) || "";
+      const firstSentence = (firstLine.split(/[.?!]\s/)[0] || "").slice(0, 80);
+
+      const subject = firstSentence.length ? `${firstSentence.trim()}...` : "Re: Your message";
+      const body = [
+        "Hello,",
+        "",
+        "I've rewritten your email to be clearer and more professional:",
+        "",
+        trimmed,
+        "",
+        "— Rewritten (dev fallback)",
+      ].join("\n");
+
+      purchase.used = true;
+      await purchase.save();
+
+      await AgentRun.create({
+        agentId: agent._id,
+        userId,
+        modelType: agent.modelType || "dev-fallback",
+        runDate: new Date(),
+        status: "completed",
+        agentName: agent.agentName,
+        agentThumbnail: agent.agentThumbnail,
+        outputSummary: subject,
+      });
+
+      return res.json({ success: true, subject, body });
+    }
+
+    // 3) AI path — call OpenAI Chat Completions API
+    const OPENAI_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_KEY) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "OPENAI_API_KEY not configured. Set OPENAI_API_KEY in .env or enable DISABLE_AI=true for local dev.",
+      });
+    }
+
+    const model = "gpt-4o";
+    console.log(`Using OpenAI model: ${model}`);
+
+    const systemPrompt = `
+You are an assistant that rewrites and improves human-written emails.
+Given a user's raw email text, produce:
+1) A concise, clear, professional SUBJECT line (one short sentence).
+2) A rewritten EMAIL BODY that is polite, well-structured, concise, and retains the original meaning and intent.
+
+Return the response in strict JSON format with keys "subject" and "body" ONLY. Example:
+{ "subject": "...", "body": "..." }
+
+Do not include any extraneous commentary, markdown, or explanation.
+`;
+
+    const chatPayload = {
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Raw email:\n\n${input}` },
+      ],
+      temperature: 0.2,
+      max_tokens: 800,
+    };
+
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(chatPayload),
+    });
+
+    if (!openaiRes.ok) {
+      const text = await openaiRes.text().catch(() => null);
+      console.error("OpenAI error:", openaiRes.status, text);
+      return res.status(502).json({
+        success: false,
+        message: `AI service error: ${openaiRes.status}`,
+      });
+    }
+
+    const openaiJson = await openaiRes.json();
+    const aiContent =
+      openaiJson?.choices?.[0]?.message?.content ||
+      openaiJson?.choices?.[0]?.text ||
+      "";
+
+    console.log("AI Content:", aiContent);
+
+    // Parse AI response JSON
+    let subject = "";
+    let body = "";
+    try {
+      const jsonStart = aiContent.indexOf("{");
+      const jsonEnd = aiContent.lastIndexOf("}");
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        const jsonStr = aiContent.slice(jsonStart, jsonEnd + 1);
+        const parsed = JSON.parse(jsonStr);
+        subject = (parsed.subject || "").trim();
+        body = (parsed.body || "").trim();
+      } else {
+        const lines = aiContent.split(/\r?\n/).filter(Boolean);
+        subject = lines[0] || `Re: ${agent.agentName}`;
+        body = lines.slice(1).join("\n\n") || aiContent;
+      }
+    } catch (err) {
+      console.warn("Failed to parse AI JSON response, falling back to raw content.", err);
+      body = aiContent.trim();
+      subject = (body.split(/[\r\n]+/)[0] || `Re: ${agent.agentName}`).slice(0, 80);
+    }
+
     purchase.used = true;
+    console.log('body' , body)
     await purchase.save();
 
-    // 4. Log the run (optional, for history)
     await AgentRun.create({
       agentId: agent._id,
       userId,
-      modelType: agent.modelType,
+      modelType: model,
       runDate: new Date(),
       status: "completed",
       agentName: agent.agentName,
+      
       agentThumbnail: agent.agentThumbnail,
+      outputSummary: subject,
+      fullOutput: aiContent,
     });
-
-    return res.json({ success: true, result });
+    return res.json({
+      success: true,
+      subject,
+      body : body, 
+    });
   } catch (error) {
     console.error("Run Agent Error:", error);
-    return res.status(500).json({ success: false, message: "Failed to run agent." });
-  }
+    return res.status(500).json({ success: false, message: "Failed to run agent." });
+}
 };
 
 

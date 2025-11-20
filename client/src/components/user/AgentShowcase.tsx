@@ -34,7 +34,7 @@ const AgentShowcase = () => {
     <>
       {" "}
       <div className={styles.header}>
-        <div>
+        <div id = "agent-showcase">
           <h2 className={styles.heading}>Explore AI Agents</h2>
           <p className={styles.subheading}>Find the perfect AI assistant for your needs</p>
         </div>
